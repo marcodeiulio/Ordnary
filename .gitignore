@@ -17,6 +17,9 @@ xcuserdata/
 timeline.xctimeline
 playground.xcworkspace
 
+## Temporary files
+.DS_Store
+
 # Swift Package Manager
 #
 # Add this line if you want to avoid checking in source code from Swift Package Manager dependencies.
@@ -40,7 +43,7 @@ playground.xcworkspace
 # Pods/
 #
 # Add this line if you want to avoid checking in source code from the Xcode workspace
-# *.xcworkspace
+*.xcworkspace
 
 # Carthage
 #
