@@ -8,23 +8,63 @@ import SwiftUI
 import UIKit
 #endif
 
+#if os(iOS)
+struct SelectAllTextField: UIViewRepresentable {
+    @Binding var text: String
+    var placeholder: String
+    var onSubmit: () -> Void
+
+    func makeUIView(context: Context) -> UITextField {
+        let tf = UITextField()
+        tf.placeholder = placeholder
+        tf.delegate = context.coordinator
+        tf.returnKeyType = .search
+        tf.addTarget(context.coordinator, action: #selector(Coordinator.textChanged(_:)), for: .editingChanged)
+        DispatchQueue.main.async { tf.becomeFirstResponder() }
+        return tf
+    }
+
+    func updateUIView(_ uiView: UITextField, context: Context) {
+        if uiView.text != text { uiView.text = text }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    class Coordinator: NSObject, UITextFieldDelegate {
+        var parent: SelectAllTextField
+        init(_ parent: SelectAllTextField) { self.parent = parent }
+
+        func textFieldDidBeginEditing(_ textField: UITextField) {
+            textField.selectAll(nil)
+        }
+
+        func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+            parent.onSubmit()
+            return true
+        }
+
+        @objc func textChanged(_ tf: UITextField) {
+            parent.text = tf.text ?? ""
+        }
+    }
+}
+#endif
+
 struct ContentView: View {
     @State private var word = ""
     @State private var isDarkMode = false
-    @FocusState private var isInputFocused: Bool
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 20) {
-                TextField("Enter a word", text: $word)
+                SelectAllTextField(text: $word, placeholder: "Enter a word", onSubmit: { word = word.trimmingCharacters(in: .whitespaces); showDefinition(for: word) })
                     .padding()
+                    .frame(height: 50)
                     .background(Color(.secondarySystemBackground))
                     .cornerRadius(15)
-                    .focused($isInputFocused)
-                    .onSubmit { showDefinition(for: word) }
 
                 Button(action: {
-                    showDefinition(for: word)
+                    word = word.trimmingCharacters(in: .whitespaces); showDefinition(for: word)
                 }) {
                     Text("Define")
                         .fontWeight(.semibold)
@@ -36,7 +76,6 @@ struct ContentView: View {
                 }
             }
             .padding(25)
-            .onAppear { isInputFocused = true }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(action: { isDarkMode.toggle() }) {
@@ -50,6 +89,7 @@ struct ContentView: View {
 
     func showDefinition(for word: String) {
 #if os(iOS)
+        guard !word.isEmpty else { return }
         let vc = UIReferenceLibraryViewController(term: word)
         if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
            let window = windowScene.keyWindow {
