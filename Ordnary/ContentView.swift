@@ -6,19 +6,22 @@
 import SwiftUI
 #if os(iOS)
 import UIKit
-#endif
 
-#if os(iOS)
 struct SelectAllTextField: UIViewRepresentable {
     @Binding var text: String
     var placeholder: String
     var onSubmit: () -> Void
+
+    @Environment(\.colorScheme) private var colorScheme
 
     func makeUIView(context: Context) -> UITextField {
         let tf = UITextField()
         tf.placeholder = placeholder
         tf.delegate = context.coordinator
         tf.returnKeyType = .search
+        tf.backgroundColor = .clear
+        tf.borderStyle = .none
+        tf.font = .systemFont(ofSize: 17, weight: .regular)
         tf.addTarget(context.coordinator, action: #selector(Coordinator.textChanged(_:)), for: .editingChanged)
         DispatchQueue.main.async { tf.becomeFirstResponder() }
         return tf
@@ -26,6 +29,11 @@ struct SelectAllTextField: UIViewRepresentable {
 
     func updateUIView(_ uiView: UITextField, context: Context) {
         if uiView.text != text { uiView.text = text }
+        let appearance: UIKeyboardAppearance = colorScheme == .dark ? .dark : .light
+        if uiView.keyboardAppearance != appearance {
+            uiView.keyboardAppearance = appearance
+            uiView.reloadInputViews()
+        }
     }
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -51,50 +59,82 @@ struct SelectAllTextField: UIViewRepresentable {
 #endif
 
 struct ContentView: View {
+    @Environment(\.colorScheme) private var colorScheme
     @State private var word = ""
-    @State private var isDarkMode = false
+    @State private var colorSchemeOverride: ColorScheme? = nil
+
+#if os(iOS)
+    private var keyWindow: UIWindow? {
+        (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.keyWindow
+    }
+#endif
+
+    func define() {
+        word = word.trimmingCharacters(in: .whitespaces)
+        showDefinition(for: word)
+    }
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 20) {
-                SelectAllTextField(text: $word, placeholder: "Enter a word", onSubmit: { word = word.trimmingCharacters(in: .whitespaces); showDefinition(for: word) })
-                    .padding()
-                    .frame(height: 50)
-                    .background(Color(.secondarySystemBackground))
-                    .cornerRadius(15)
-
-                Button(action: {
-                    word = word.trimmingCharacters(in: .whitespaces); showDefinition(for: word)
-                }) {
-                    Text("Define")
-                        .fontWeight(.semibold)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(15)
-                }
-            }
-            .padding(25)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(action: { isDarkMode.toggle() }) {
-                        Image(systemName: isDarkMode ? "sun.max.fill" : "moon.fill")
+            Spacer()
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button(action: toggleColorScheme) {
+                            Image(systemName: colorScheme == .dark ? "sun.max.fill" : "moon.fill")
+                        }
                     }
                 }
-            }
+                .safeAreaInset(edge: .bottom) {
+                    HStack(spacing: 8) {
+                        SelectAllTextField(text: $word, placeholder: "Enter a word", onSubmit: define)
+                            .padding(.leading, 16)
+                            .frame(height: 44)
+
+                        Button(action: define) {
+                            Image(systemName: "arrow.up.circle.fill")
+                                .font(.system(size: 32, weight: .medium))
+                                .symbolRenderingMode(.multicolor)
+                                .foregroundStyle(.blue)
+                        }
+                        .padding(.trailing, 6)
+                    }
+                    .frame(height: 52)
+                    .glassEffect(in: Capsule())
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 12)
+                }
+                .background {
+                    Image("letters-wallpaper")
+                        .resizable()
+                        .scaledToFill()
+                        .ignoresSafeArea()
+                        .overlay(alignment: .top) {
+                            LinearGradient(
+                                colors: [.black.opacity(0.4), .clear],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                            .frame(height: 120)
+                            .ignoresSafeArea()
+                        }
+                }
         }
-        .preferredColorScheme(isDarkMode ? .dark : .light)
+        .preferredColorScheme(colorSchemeOverride)
+    }
+
+    func toggleColorScheme() {
+        let newScheme: ColorScheme = colorScheme == .dark ? .light : .dark
+        colorSchemeOverride = newScheme
+#if os(iOS)
+        keyWindow?.overrideUserInterfaceStyle = newScheme == .dark ? .dark : .light
+#endif
     }
 
     func showDefinition(for word: String) {
 #if os(iOS)
         guard !word.isEmpty else { return }
         let vc = UIReferenceLibraryViewController(term: word)
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let window = windowScene.keyWindow {
-            window.rootViewController?.present(vc, animated: true)
-        }
+        keyWindow?.rootViewController?.present(vc, animated: true)
 #endif
     }
 }
